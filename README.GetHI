@@ -1,0 +1,98 @@
+GetHI
+
+1 Introduction.
+
+GetHI generates random realizations of the temperature fluctuations
+due to the 21 cm emission of neutral hydrogen in the late Universe
+(z <~ 3-4). The method used by GetHI can be summarized as follows:
+ a) Generate a three-dimensional Gaussian realization of the matter
+    density field in a Cartesian grid.
+ b) Generate the corresponding radial velocity field by solving the
+    linear continuity equation. This will be used later to include
+    redshift-space distortions (RSDs).
+ d) Calculate the redshift of each grid cell and linearly evolve the
+    density and velocity fields to that redshift. Include a redshift-
+    dependent linear bias for the density field corresponding to the
+    neutral hydrogen bias (see section 5).
+ c) Perform a lognormal transformation on the Gaussian density field.
+    The lognormal transformation (Coles & Jones, 1993) enforces a
+    physical (>0) density and takes care of part of the non-linear
+    evolution.
+ e) Calculate the neutral hydrogen mass contained in each grid cell.
+    for this GetHI must use a particular prescription for the 
+    neutral hydrogen fraction x_HI(z) (see section 5).
+ d) Interpolate the Cartesian grid to a set of spherical shells. Each
+    shell corresponds to a frequency interval and to a redshift
+    interval (nu=nu_21cm/(1+z)). When performing this interpolation
+    the velocity field must be taken into account to include RSDs.
+    The spherical shells are pixelized using HEALPix.
+
+In what follows we will briefly describe the compilation, usage,
+input and output of GetHI.
+
+
+2 Compilation and usage.
+
+To compile GetHI, open the Makefile and edit it according to your
+system. The default options (except for the paths to the external
+libraries) should work for most systems. GetHI may be very memory-
+demanding. To minimize the memory overhead enable the flag
+_FFT_IN_PLACE and use single precision floating point
+(USE_PRECISION = yes).
+
+GetHI uses 4 external packages:
+ - GSL. The GNU Scientific Library (tested for versions 3.*)
+ - FFTW. The Fastest Fourier Transform of the West (versions 3.*)
+ - CFITSIO. FITS format library.
+ - HEALPix. The C library should be installed (version >=3.10).
+The paths to the corresponding headers and libraries should be correctly
+set in the Makefile.
+
+Once the Makefile has been editted, typing 'make' should generate
+the executable 'GetHI'. To run GetHI just type
+
+> ./GetHI <param_file>
+
+where <param_file> is the path to the parameter file described in
+section 3.
+
+
+3 Parameter file.
+
+The behaviour of GetHI is mainly controlled by the input param file. The
+param file is basically a set of name-value pairs. Any blank lines, and 
+anything beyond a #-symbol will be ignored. We provide a sample param
+file (param_sample.ini) that includes all the input parameters needed by
+GetHI. The comments included in this file explain the meaning and
+functionality of these parameters.
+
+
+4 Output.
+
+The main output of GetHI is a set of fits-files containing the HEALPix
+maps corresponding to the 21cm temperature fluctuations in different
+frequency bands. For instance, for the values used in param_sample.ini,
+the output maps would be stored in test_001.fits - test_150.fits. These
+maps will be stored with RING ordering.
+
+GetHI also generates a frequency table with the format:
+    i  nu0  nuf  z0  zf,
+where i is the map number for the different output maps, [nu0,nuf] is the
+frequency range for that map and [z0,zf] is the corresponding redshift
+range. This frequency table is written in <prefix>_nuTable.dat, where
+<prefix> is the output prefix chosen in the param file.
+
+
+5 Note on x_HI(z) and b_HI(z).
+
+GetHI uses two model-dependent ingredients to generate the cosmological
+signal: the redshift-dependent neutral hydrogen fraction x_HI(z) and the
+neutral hydrogen bias. By default GetHI uses a constant bias of 1 and:
+  x_HI(z) = 0.008*(1+z), 
+which is a rough fit to the measurements of TODO (z=0.1) and TODO (z=1.5).
+These models are very simplistic and the user may want to use other 
+prescriptions. In order to do this, the source code itself must be altered,
+however we have structured the code so that the necessary changes are
+minimal. Thus, in order to change the prescription for x_HI and/or b_HI,
+the user only needs to modify the functions "fraction_HI" and "bias_HI" in
+the file "src/user_defined.c".
