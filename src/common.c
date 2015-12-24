@@ -21,6 +21,8 @@ void mpi_init(int* p_argc,char*** p_argv)
   MPIThreadsOK=0;
 #endif //_HAVE_OMP
 
+  MPI_Comm_size(MPI_COMM_WORLD,&NNodes);
+  MPI_Comm_rank(MPI_COMM_WORLD,&NodeThis);
   if(NodeThis==0)
     NodeLeft=NNodes-1;
   else
@@ -31,8 +33,6 @@ void mpi_init(int* p_argc,char*** p_argv)
     NodeRight=NodeThis+1;
      
 
-  MPI_Comm_size(MPI_COMM_WORLD,&NNodes);
-  MPI_Comm_rank(MPI_COMM_WORLD,&NodeThis);
   nthreads_all=my_malloc(NNodes*sizeof(int));
 #ifdef _HAVE_OMP
   nthreads_this=omp_get_max_threads();
