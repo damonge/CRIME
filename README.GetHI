@@ -36,15 +36,21 @@ input and output of GetHI.
 To compile GetHI, open the Makefile and edit it according to your
 system. The default options (except for the paths to the external
 libraries) should work for most systems. GetHI may be very memory-
-demanding. To minimize the memory overhead enable the flag
-_FFT_IN_PLACE and use single precision floating point
-(USE_PRECISION = yes).
+demanding. To minimize the memory overhead use single precision
+floating point (USE_PRECISION = yes).
+
+OpenMP parallelization is enabled by setting the option USE_OMP
+to "yes".
+
+MPI parallelization is enabled by setting the option USE_MPI
+to "yes".
 
 GetHI uses 4 external packages:
  - GSL. The GNU Scientific Library (tested for versions 3.*)
  - FFTW. The Fastest Fourier Transform of the West (versions 3.*)
  - CFITSIO. FITS format library.
  - HEALPix. The C library should be installed (version >=3.10).
+ - libsharp. The library should be installed.
 The paths to the corresponding headers and libraries should be correctly
 set in the Makefile.
 

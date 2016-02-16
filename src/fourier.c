@@ -1,4 +1,79 @@
+///////////////////////////////////////////////////////////////////////
+//                                                                   //
+//   Copyright 2012 David Alonso                                     //
+//                                                                   //
+//                                                                   //
+// This file is part of CRIME.                                       //
+//                                                                   //
+// CRIME is free software: you can redistribute it and/or modify it  //
+// under the terms of the GNU General Public License as published by //
+// the Free Software Foundation, either version 3 of the License, or //
+// (at your option) any later version.                               //
+//                                                                   //
+// CRIME is distributed in the hope that it will be useful, but      //
+// WITHOUT ANY WARRANTY; without even the implied warranty of        //
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU //
+// General Public License for more details.                          //
+//                                                                   //
+// You should have received a copy of the GNU General Public License //
+// along with CRIME.  If not, see <http://www.gnu.org/licenses/>.    //
+//                                                                   //
+///////////////////////////////////////////////////////////////////////
 #include "common_gh.h"
+
+static void compute_sigma_dens(ParamGetHI *par)
+{
+  double mean_gauss=0;
+  par->sigma2_gauss=0;
+
+  //Compute Gaussian variance
+#ifdef _HAVE_OMP
+#pragma omp parallel default(none) \
+  shared(par,mean_gauss)
+#endif //_HAVE_OMP
+  {
+    int iz;
+    double sigma2_thr=0;
+    double mean_thr=0;
+    lint ng_tot=par->n_grid*((lint)(par->n_grid*par->n_grid));
+
+#ifdef _HAVE_OMP
+#pragma omp for
+#endif //_HAVE_OMP
+    for(iz=0;iz<par->nz_here;iz++) {
+      int iy;
+      lint iz0=iz*((lint)(2*(par->n_grid/2+1)*par->n_grid));
+      for(iy=0;iy<par->n_grid;iy++) {
+	int ix;
+	lint iy0=iy*2*(par->n_grid/2+1);
+	for(ix=0;ix<par->n_grid;ix++) {
+	  lint index=ix+iy0+iz0;
+	  sigma2_thr+=par->grid_dens[index]*par->grid_dens[index];
+	  mean_thr+=par->grid_dens[index];
+	}
+      }
+    } //end omp for
+#ifdef _HAVE_OMP
+#pragma omp critical
+#endif //_HAVE_OMP
+    {
+      mean_gauss+=mean_thr/ng_tot;
+      par->sigma2_gauss+=sigma2_thr/ng_tot;
+    } //end omp critical
+  } //end omp parallel
+
+#ifdef _HAVE_MPI
+  double sigma2_gathered=0,mean_gathered=0;
+
+  MPI_Allreduce(&(par->sigma2_gauss),&sigma2_gathered,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+  MPI_Allreduce(&mean_gauss,&mean_gathered,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+  mean_gauss=mean_gathered;
+  par->sigma2_gauss=sigma2_gathered;
+#endif //_HAVE_MPI
+
+  par->sigma2_gauss-=mean_gauss*mean_gauss;
+  print_info(" <d>=%.3lE, <d^2>=%.3lE\n",mean_gauss,sqrt(par->sigma2_gauss));
+}
 
 static void fftw_wrap(int ng,dftw_complex *pin,flouble *pout)
 {
@@ -39,7 +114,7 @@ void init_fftw(ParamGetHI *par)
     stat=fftw_init_threads();
 #endif //_SPREC
     if(!stat) {
-      fprintf(stderr,"CRIME: Couldn't initialize FFTW threads \n");
+      fprintf(stderr,"Couldn't initialize FFTW threads \n");
       exit(1);
     }
   }
@@ -73,16 +148,15 @@ void init_fftw(ParamGetHI *par)
   par->iz0_here=iz0;
 
 #else //_HAVE_MPI
-
-#ifdef _HAVE_OMP
   int stat;
+#ifdef _HAVE_OMP
 #ifdef _SPREC
   stat=fftwf_init_threads();
 #else //_SPREC
   stat=fftw_init_threads();
 #endif //_SPREC
   if(!stat) {
-    fprintf(stderr,"CRIME: Couldn't initialize FFTW threads \n");
+    fprintf(stderr,"Couldn't initialize FFTW threads \n");
     exit(1);
   }
 #ifdef _SPREC
@@ -116,6 +190,8 @@ void init_fftw(ParamGetHI *par)
   par->grid_vpot=(flouble *)(par->grid_vpot_f);
 
   par->grid_rvel=my_malloc(2*dsize*sizeof(flouble));
+  if(par->do_psources)
+    par->nsources=my_malloc(2*dsize*sizeof(int));
 #ifdef _HAVE_MPI
   par->slice_left=my_malloc(2*(par->n_grid/2+1)*par->n_grid*sizeof(flouble));
   par->slice_right=my_malloc(2*(par->n_grid/2+1)*par->n_grid*sizeof(flouble));
@@ -155,13 +231,12 @@ void end_fftw(void)
 #endif //_HAVE_MPI
 }
 
-void create_density_and_radvel(ParamGetHI *par)
+static void create_density_and_velpot_fourier(ParamGetHI *par)
 {
-  print_info(0,"*** Generating Gaussian density and velocity fields\n");
+  //////
+  // Generates a random realization of the delta_k
+  // from the linear P_k.
 
-  print_info(1," Generating Fourier-space quantities\n");
-
-  //Create Fourier-space delta and velocity potential
 #ifdef _HAVE_OMP
 #pragma omp parallel default(none)		\
   shared(par,IThread0)
@@ -170,14 +245,9 @@ void create_density_and_radvel(ParamGetHI *par)
     int ii;
     double dk=2*M_PI/par->l_box;
     double idk3=1./(dk*dk*dk);
-#ifdef _HAVE_OMP
-    unsigned long seed_thr=par->seed_rng+IThread0+omp_get_thread_num();
-#else //_HAVE_OMP
-    unsigned long seed_thr=par->seed_rng+IThread0;
-#endif //_HAVE_OMP
-    Rng *rng_thr=init_rng(seed_thr);
+    unsigned int seed_thr=par->seed_rng+IThread0+omp_get_thread_num();
+    gsl_rng *rng_thr=init_rng(seed_thr);
     double factor=par->fgrowth_0*par->hubble_0;
-    double norm_factor=pow(sqrt(2*M_PI)/par->l_box,3);
     
 #ifdef _HAVE_OMP
 #pragma omp for
@@ -201,6 +271,7 @@ void create_density_and_radvel(ParamGetHI *par)
 	  double kx;
 	  double k_mod2;
 	  lint index=kk+(par->n_grid/2+1)*((lint)(jj+par->n_grid*ii)); //Grid index for +k
+	  double delta_mod,delta_phase;
 	  if(2*kk<=par->n_grid)
 	    kx=kk*dk;
 	  else
@@ -214,40 +285,22 @@ void create_density_and_radvel(ParamGetHI *par)
 	  }
 	  else {
 	    double lgk=0.5*log10(k_mod2);
-	    double sigma=sqrt(pk_linear0(par,lgk)*idk3*0.5);
-	    double re=sigma*rand_gauss(rng_thr);
-	    double im=sigma*rand_gauss(rng_thr);
-	    par->grid_dens_f[index]=norm_factor*(re+I*im);
-	    par->grid_vpot_f[index]=factor*par->grid_dens_f[index]/k_mod2;
+	    double sigma2=pk_linear0(par,lgk)*idk3;
+	    if(par->do_smoothing)
+	      sigma2*=exp(-par->r2_smooth*k_mod2);
+	    rng_delta_gauss(&delta_mod,&delta_phase,rng_thr,sigma2);
+	    par->grid_dens_f[index]=delta_mod*cexp(I*delta_phase);
+	    par->grid_vpot_f[index]=par->grid_dens_f[index]*factor/k_mod2;
 	  }
 	}
       }
-    } //end omp for
+    }
     end_rng(rng_thr);
-  } //end omp parallel
+  }
+}
 
-  //Transform to real space
-  print_info(1," Transforming to real space\n");
-  fftw_wrap(par->n_grid,par->grid_dens_f,par->grid_dens);
-  fftw_wrap(par->n_grid,par->grid_vpot_f,par->grid_vpot);
-
-  lint slice_size=2*(par->n_grid/2+1)*par->n_grid;
-#ifdef _HAVE_MPI
-  MPI_Status stat;
-
-  //Pass rightmost slice to right node and receive left slice from left node
-  MPI_Sendrecv(&(par->grid_vpot[(par->nz_here-1)*slice_size]),slice_size,FLOUBLE_MPI,NodeRight,1,
-	       par->slice_left,slice_size,FLOUBLE_MPI,NodeLeft,1,MPI_COMM_WORLD,&stat);
-  //Pass leftmost slice to left node and receive right slice from right node
-  MPI_Sendrecv(par->grid_vpot,slice_size,FLOUBLE_MPI,NodeLeft,2,
-	       par->slice_right,slice_size,FLOUBLE_MPI,NodeRight,2,MPI_COMM_WORLD,&stat);
-#else //_HAVE_MPI
-  par->slice_left=&(par->grid_vpot[(par->n_grid-1)*slice_size]);
-  par->slice_right=par->grid_vpot;
-#endif //_HAVE_MPI
-
-  //Compute radial velocity as projected gradient of the velocity potential
-  print_info(1," Differetiating velocity potential\n");
+static void radial_velocity_from_potential(ParamGetHI *par)
+{
 #ifdef _HAVE_OMP
 #pragma omp parallel default(none)		\
   shared(par)
@@ -267,6 +320,8 @@ void create_density_and_radvel(ParamGetHI *par)
       lint iz_lo=iz-1;
       lint iz_0=iz;
       double z=dx*(iz+par->iz0_here+0.5)-par->pos_obs[2];
+      if(iz==0) iz_lo=par->n_grid-1;
+      if(iz==par->n_grid-1) iz_hi=0;
       iz_hi*=ngx*par->n_grid;
       iz_lo*=ngx*par->n_grid;
       iz_0*=ngx*par->n_grid;
@@ -282,7 +337,8 @@ void create_density_and_radvel(ParamGetHI *par)
 	iy_lo*=ngx;
 	iy_0*=ngx;
 	for(ix=0;ix<par->n_grid;ix++) {
-	  double vel[3],ur[3];
+	  double vel[3];
+	  double ur[3];
 	  lint ix_hi=ix+1;
 	  lint ix_lo=ix-1;
 	  lint ix_0=ix;
@@ -309,4 +365,69 @@ void create_density_and_radvel(ParamGetHI *par)
       }
     } // end omp for
   } // end omp parallel
+}
+
+void create_d_and_vr_fields(ParamGetHI *par)
+{
+  //////
+  // Creates a realization of the gaussian density
+  // contrast field from the linear P_k
+  
+  lint n_grid_tot=2*(par->n_grid/2+1)*((lint)(par->n_grid*par->nz_here));
+  print_info("*** Creating Gaussian density field \n");
+
+  print_info("Creating Fourier-space density and velocity potential \n");
+  if(NodeThis==0) timer(0);
+  create_density_and_velpot_fourier(par);
+  if(NodeThis==0) timer(2);
+
+  print_info("Transforming density and velocity potential\n");
+  if(NodeThis==0) timer(0);
+  fftw_wrap(par->n_grid,par->grid_dens_f,par->grid_dens);
+  fftw_wrap(par->n_grid,par->grid_vpot_f,par->grid_vpot);
+  if(NodeThis==0) timer(2);
+
+  print_info("Normalizing density and velocity potential \n");
+  if(NodeThis==0) timer(0);
+#ifdef _HAVE_OMP
+#pragma omp parallel default(none)				\
+  shared(n_grid_tot,par)
+#endif //_HAVE_OMP
+  {
+    lint ii;
+    double norm=pow(sqrt(2*M_PI)/par->l_box,3);
+    
+#ifdef _HAVE_OMP
+#pragma omp for
+#endif //_HAVE_OMP
+    for(ii=0;ii<n_grid_tot;ii++) {
+      par->grid_dens[ii]*=norm;
+      par->grid_vpot[ii]*=norm;
+    }
+  }//end omp parallel
+  if(NodeThis==0) timer(2);
+
+  lint slice_size=2*(par->n_grid/2+1)*par->n_grid;
+#ifdef _HAVE_MPI
+  MPI_Status stat;
+
+  //Pass rightmost slice to right node and receive left slice from left node
+  MPI_Sendrecv(&(par->grid_vpot[(par->nz_here-1)*slice_size]),slice_size,FLOUBLE_MPI,NodeRight,1,
+	       par->slice_left,slice_size,FLOUBLE_MPI,NodeLeft,1,MPI_COMM_WORLD,&stat);
+  //Pass leftmost slice to left node and receive right slice from right node
+  MPI_Sendrecv(par->grid_vpot,slice_size,FLOUBLE_MPI,NodeLeft,2,
+	       par->slice_right,slice_size,FLOUBLE_MPI,NodeRight,2,MPI_COMM_WORLD,&stat);
+#else //_HAVE_MPI
+  par->slice_left=&(par->grid_vpot[(par->n_grid-1)*slice_size]);
+  par->slice_right=par->grid_vpot;
+#endif //_HAVE_MPI
+
+  print_info("Calculating radial velocity \n");
+  if(NodeThis==0) timer(0);
+  radial_velocity_from_potential(par);
+  if(NodeThis==0) timer(2);
+
+  compute_sigma_dens(par);
+
+  print_info("\n");
 }

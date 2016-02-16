@@ -1,31 +1,76 @@
+///////////////////////////////////////////////////////////////////////
+//                                                                   //
+//   Copyright 2012 David Alonso                                     //
+//                                                                   //
+//                                                                   //
+// This file is part of CRIME.                                       //
+//                                                                   //
+// CRIME is free software: you can redistribute it and/or modify it  //
+// under the terms of the GNU General Public License as published by //
+// the Free Software Foundation, either version 3 of the License, or //
+// (at your option) any later version.                               //
+//                                                                   //
+// CRIME is distributed in the hope that it will be useful, but      //
+// WITHOUT ANY WARRANTY; without even the implied warranty of        //
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU //
+// General Public License for more details.                          //
+//                                                                   //
+// You should have received a copy of the GNU General Public License //
+// along with CRIME.  If not, see <http://www.gnu.org/licenses/>.    //
+//                                                                   //
+///////////////////////////////////////////////////////////////////////
 #include "common_gh.h"
 
 int main(int argc,char **argv)
-{
+{ 
+  char fnameIn[256];
   ParamGetHI *par;
-  char fname_init[256];
-
   if(argc!=2) {
-    fprintf(stderr,"Usage: ./GetHI param_file\n");
-    exit(1);
+    fprintf(stderr,"Usage: ./GetHI file_name\n");
+    exit(0);
   }
-  sprintf(fname_init,"%s",argv[1]);
+  sprintf(fnameIn,"%s",argv[1]);
 
   mpi_init(&argc,&argv);
 
-  par=read_run_params(fname_init);
-  int ii;
-  int nz=1000;
-  FILE *fi=my_fopen("test_bg.txt","w");
-  for(ii=0;ii<nz;ii++) {
-    double z=5.*(ii+0.5)/nz;
-    fprintf(fi,"%lE %lE \n",z,z-z_of_r(par,r_of_z(par,z)));
+  setbuf(stdout,NULL);
+  print_info("\n");
+  print_info("|-------------------------------------------------|\n");
+  print_info("|                      GetHI                      |\n");
+  print_info("|-------------------------------------------------|\n\n");
+
+  if(NodeThis==0) timer(4);
+
+  par=read_run_params(fnameIn);
+
+  print_info("Seed : %u\n",par->seed_rng);
+
+
+  //Arrays for point sources
+
+  //Create Gaussian density and radial velocity fields
+  create_d_and_vr_fields(par);
+
+  //Poisson-sample for point sources, transform to HI mass and to Dz_RSD
+  if(par->do_psources) {
+    setup_psources(par);
+    get_point_sources(par);
   }
-  fclose(fi);
-  create_density_and_radvel(par);
-  mk_HI_maps(par);
+  get_HI(par);
+
+  //Pixelize maps
+  mk_T_maps(par);
+  if(par->do_psources)
+    mk_psources_maps(par);
+
+  //Write temperature maps
   if(NodeThis==0)
-    write_output(par);
+    write_maps(par);
+  if(NodeThis==0) timer(5);
+
+  print_info("\n");
+  print_info("|-------------------------------------------------|\n\n");
+
   param_gethi_free(par);
 
 #ifdef _HAVE_MPI

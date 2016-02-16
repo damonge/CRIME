@@ -1,0 +1,71 @@
+ForGet
+
+1 Introduction.
+
+ForGet generates realizations of different galactic and extragalactic
+foregrounds relevant to intensity mapping experiments. 4 types of
+foregrounds are currently implemented:
+ a) Galactic synchrotron (polarized and unpolarized).
+ b) Galactic free-free (Bremsstrahlung emission).
+ c) Extra-galactic free-free.
+ d) Extra-galactic point sources.
+The foregrounds b-d are simply generated as gaussian realizations of
+the angular power-spectra C_l(nu1,nu2) modelled by Santos, Cooray
+& Knox, 2005, with the parameters given in our companion paper.
+
+On the other hand, galactic synchrotron is arguably the most relevant
+foreground for intensity mapping. Not only does it have the largest
+amplitude by far, but also its polarized part is not spectrally smooth
+due to Faraday rotation within the galaxy, which is potentially harmful
+in the context of foreground subtraction due to polarization leakage.
+On top of this, since it is a galactic foreground, synchrotron emission
+is not isotropic, being larger close to the galactic plane and dropping
+towards high galactic latitudes. For these reason a slightly different
+method was used to simulate this foreground, the details of which can
+be found in arXiv:1405.1751.
+
+In what follows we will briefly describe the compilation, usage, input
+and output of ForGet.
+
+
+2 Compilation and usage.
+
+These instructions are the same for both ForGet and JoinT.
+To compile ForGet and JoinT, open the Makefile and edit it according
+to your system. The default compilation options should work for most
+systems.
+
+ForGet and JoinT use 3 external packages:
+ - CFITSIO. FITS format library.
+ - HEALPix. C library should be installed (version >=3.10).
+ - LIBSHARP. Spherical Harmonic Transform library.
+The paths to the corresponding header files and libraries should be
+correctly set in the Makefile.
+
+Once the Makefile has been editted, typing 'make' should generate
+the executables 'ForGet' and 'JoinT'. To run them just type
+
+> ./<exec_name> <param_file>
+
+where <exec_name> is either of the executables and <param_file> is the
+path to their corresponding parameter file (see section 3).
+
+
+3 Parameter file.
+
+The behaviour of ForGet is mainly controlled by the input param file.
+The param file is basically a set of name-value pairs. Any blank lines
+and anything beyond a #-symbol will be ignored. We provide a sample
+param file (param_ForGet_sample.ini) that includes all the input
+parameters needed by ForGet. The comments included in this file
+explain the meaning and functionality of these parameters.
+
+
+4 Output.
+
+The output of ForGet is a set of fits-files containing the HEALPix
+maps corresponding to the foreground selected for the run in different
+frequency bands. For instance, for the values used in param_ForGet_sample.ini,
+the output maps would be stored in test_001.fits - test_150.fits. These
+maps will be stored with RING ordering. If running with do_polarization= 1,
+each output FITS file will contain the three Stokes parameters (I,Q,U).
