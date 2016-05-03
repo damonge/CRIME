@@ -42,7 +42,12 @@ void get_point_sources(ParamGetHI *par)
     double cell_vol=dx*dx*dx;
     lint np_tot_thr=0;
     int ngx=2*(par->n_grid/2+1);
-    unsigned int seed_thr=par->seed_rng+IThread0+omp_get_thread_num();
+#ifdef _HAVE_OMP
+    int ithr=omp_get_thread_num();
+#else //_HAVE_OMP
+    int ithr=0;
+#endif //_HAVE_OMP
+    unsigned int seed_thr=par->seed_rng+IThread0+ithr;
     gsl_rng *rng_thr=init_rng(seed_thr);
 
 #ifdef _HAVE_OMP

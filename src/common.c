@@ -83,7 +83,25 @@ void timer(int i)
   // timer(2) -> read relative clock and initialize it afterwards
   // timer(4) -> initialize absolute clock
   // timer(5) -> read absolute clock
-#ifdef _NO_OMP
+#ifdef _HAVE_OMP
+  if(i==0)
+    relbeg=omp_get_wtime();
+  else if(i==1) {
+    relend=omp_get_wtime();
+    printf(">    Relative time ellapsed %.1lf ms\n",1000*(relend-relbeg));
+  }
+  else if(i==2) {
+    relend=omp_get_wtime();
+    printf(">    Relative time ellapsed %.1lf ms\n",1000*(relend-relbeg));
+    relbeg=omp_get_wtime();
+  }
+  else if(i==4)
+    absbeg=omp_get_wtime();
+  else if(i==5) {
+    absend=omp_get_wtime();
+    printf(">    Total time ellapsed %.1lf ms\n",1000*(absend-absbeg));
+  }
+#else //_HAVE_OMP
   int diff;
   
   if(i==0)
@@ -109,25 +127,7 @@ void timer(int i)
     printf(">    Total time ellapsed %02d:%02d:%02d \n",
 	   diff/3600,(diff/60)%60,diff%60);
   }
-#else //_NO_OMP
-  if(i==0)
-    relbeg=omp_get_wtime();
-  else if(i==1) {
-    relend=omp_get_wtime();
-    printf(">    Relative time ellapsed %.1lf ms\n",1000*(relend-relbeg));
-  }
-  else if(i==2) {
-    relend=omp_get_wtime();
-    printf(">    Relative time ellapsed %.1lf ms\n",1000*(relend-relbeg));
-    relbeg=omp_get_wtime();
-  }
-  else if(i==4)
-    absbeg=omp_get_wtime();
-  else if(i==5) {
-    absend=omp_get_wtime();
-    printf(">    Total time ellapsed %.1lf ms\n",1000*(absend-absbeg));
-  }
-#endif //_NO_OMP
+#endif //_HAVE_OMP
 }
 
 gsl_rng *init_rng(unsigned int seed)

@@ -120,14 +120,23 @@ flouble **get_sck_maps(ParamsForGet *pars)
   printf("  Generating uncorrelated alms\n");
   timer(0);
   set_cls(pars);
+#ifdef _HAVE_OMP
 #pragma omp parallel default(none) \
   shared(pars,alms_uncorr,eigenval)
+#endif //_HAVE_OMP
   {
     int i;
-    unsigned int seed_thr=pars->seed+omp_get_thread_num();
+#ifdef _HAVE_OMP
+    int ithr=omp_get_thread_num();
+#else //_HAVE_OMP
+    int ithr=0;
+#endif //_HAVE_OMP
+    unsigned int seed_thr=pars->seed+ithr;
     gsl_rng *rng_thr=init_rng(seed_thr);
 
+#ifdef _HAVE_OMP
 #pragma omp for
+#endif //_HAVE_OMP
     for(i=0;i<pars->n_nu;i++) {
       double scale=gsl_vector_get(eigenval,i);
       alms_uncorr[i]=get_alms(pars,scale,rng_thr);
@@ -149,16 +158,20 @@ flouble **get_sck_maps(ParamsForGet *pars)
   for(ii=0;ii<pars->n_nu;ii++)
     alms_corr[ii]=(fcomplex *)my_malloc(he_nalms(pars->lmax)*sizeof(fcomplex));
 
+#ifdef _HAVE_OMP
 #pragma omp parallel default(none)		\
   shared(pars,alms_uncorr,eigenvec,alms_corr)
+#endif //_HAVE_OMP
   {
     int i;
     gsl_vector *aux1_re=gsl_vector_alloc(pars->n_nu);
     gsl_vector *aux1_im=gsl_vector_alloc(pars->n_nu);
     gsl_vector *aux2_re=gsl_vector_alloc(pars->n_nu);
     gsl_vector *aux2_im=gsl_vector_alloc(pars->n_nu);
-    
+
+#ifdef _HAVE_OMP    
 #pragma omp for
+#endif //_HAVE_OMP
     for(i=0;i<he_nalms(pars->lmax);i++) {
       int j;
       for(j=0;j<pars->n_nu;j++) {

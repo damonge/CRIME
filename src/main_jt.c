@@ -80,12 +80,16 @@ static void assert_nside(long nside1,long nside2)
 
 static void add_maps(long npix,flouble *map_to_sum,flouble *map_result)
 {
+#ifdef _HAVE_OMP
 #pragma omp parallel default(none)		\
   shared(npix,map_to_sum,map_result)
+#endif //_HAVE_OMP
   {
     long ii;
 
+#ifdef _HAVE_OMP
 #pragma omp for
+#endif //_HAVE_OMP
     for(ii=0;ii<npix;ii++)
       map_result[ii]+=map_to_sum[ii];
   }
@@ -219,12 +223,16 @@ void apply_beam(ParamsJoinT *pars,flouble **maps)
   he_map2alm(pars->nside,lmax,pars->n_nu,maps,alms);
 
   //alter alms
+#ifdef _HAVE_OMP
 #pragma omp parallel default(none)		\
   shared(pars,lmax,alms)
+#endif //_HAVE_OMP
   {
     int ii;
 
+#ifdef _HAVE_OMP
 #pragma omp for
+#endif //_HAVE_OMP
     for(ii=0;ii<pars->n_nu;ii++) {
       double nu=pars->nutable[0][ii];
       double fwhm=PREFAC_FWHM/(nu*pars->dish_diameter);
@@ -245,13 +253,17 @@ void apply_beam(ParamsJoinT *pars,flouble **maps)
 
 void apply_mask(ParamsJoinT *pars,flouble **maps)
 {
+#ifdef _HAVE_OMP
 #pragma omp parallel default(none)		\
   shared(pars,maps)
+#endif //_HAVE_OMP
   {
     int inu;
     long npix=nside2npix(pars->nside);
     
+#ifdef _HAVE_OMP
 #pragma omp for
+#endif //_HAVE_OMP
     for(inu=0;inu<pars->n_nu;inu++) {
       long ii;
 
@@ -264,15 +276,24 @@ void apply_mask(ParamsJoinT *pars,flouble **maps)
 
 void add_noise(ParamsJoinT *pars,flouble **maps)
 {
+#ifdef _HAVE_OMP
 #pragma omp parallel default(none)		\
   shared(pars,maps)
+#endif //_HAVE_OMP
   {
     int inu;
     long npix=nside2npix(pars->nside);
-    unsigned int seed_thr=pars->seed+omp_get_thread_num();
+#ifdef _HAVE_OMP
+    int ithr=omp_get_thread_num();
+#else //_HAVE_OMP
+    int ithr=0;
+#endif //_HAVE_OMP
+    unsigned int seed_thr=pars->seed+ithr;
     gsl_rng *rng=init_rng(seed_thr);
 
+#ifdef _HAVE_OMP
 #pragma omp for
+#endif //_HAVE_OMP
     for(inu=0;inu<pars->n_nu;inu++) {
       long ii;
       double nu=pars->nutable[0][inu];

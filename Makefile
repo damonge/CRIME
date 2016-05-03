@@ -40,8 +40,8 @@ FITS_LIB =
 #
 ########## End of user-definable ##########
 
-ifeq ($(strip $(USE_OMP)),yes)
 OPTIONS += -fopenmp
+ifeq ($(strip $(USE_OMP)),yes)
 DEFINEFLAGS += -D_HAVE_OMP
 endif #OMP
 

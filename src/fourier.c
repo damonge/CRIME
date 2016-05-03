@@ -148,8 +148,8 @@ void init_fftw(ParamGetHI *par)
   par->iz0_here=iz0;
 
 #else //_HAVE_MPI
-  int stat;
 #ifdef _HAVE_OMP
+  int stat;
 #ifdef _SPREC
   stat=fftwf_init_threads();
 #else //_SPREC
@@ -245,7 +245,12 @@ static void create_density_and_velpot_fourier(ParamGetHI *par)
     int ii;
     double dk=2*M_PI/par->l_box;
     double idk3=1./(dk*dk*dk);
-    unsigned int seed_thr=par->seed_rng+IThread0+omp_get_thread_num();
+#ifdef _HAVE_OMP
+    int ithr=omp_get_thread_num();
+#else //_HAVE_OMP
+    int ithr=0;
+#endif //_HAVE_OMP
+    unsigned int seed_thr=par->seed_rng+IThread0+ithr;
     gsl_rng *rng_thr=init_rng(seed_thr);
     double factor=par->fgrowth_0*par->hubble_0;
     

@@ -176,14 +176,23 @@ static void get_uncorrelated_maps(ParamsForGet *pars,flouble ***maps_out_q,
     maps_u[ii]=(flouble *)my_malloc(nside2npix(NSIDE_POL)*sizeof(flouble));
   }
 
+#ifdef _HAVE_OMP
 #pragma omp parallel default(none)				\
   shared(pars,alms_q,alms_u,cls_pol,glb_nx,maps_q,maps_u)
+#endif //_HAVE_OMP
   {
     int ix;
-    unsigned int seed_thr=pars->seed+omp_get_thread_num();
+#ifdef _HAVE_OMP
+    int ithr=omp_get_thread_num();
+#else //_HAVE_OMP
+    int ithr=0;
+#endif //_HAVE_OMP
+    unsigned int seed_thr=pars->seed+ithr;
     gsl_rng *rng=init_rng(seed_thr);
 
+#ifdef _HAVE_OMP
 #pragma omp for
+#endif //_HAVE_OMP
     for(ix=0;ix<glb_nx;ix++) {
       int l;
       for(l=0;l<=NL_POL;l++) {
@@ -324,13 +333,17 @@ void do_polarization(ParamsForGet *pars,flouble ***maps_nuspace_q,
     maps_nu_u[ii]=(flouble *)my_calloc(nside2npix(NSIDE_POL),sizeof(flouble));
   }
 
+#ifdef _HAVE_OMP
 #pragma omp parallel default(none)		\
   shared(maps_nu_q,maps_nu_u,maps_x_q,maps_x_u) \
   shared(pars,map_specin,normalization)
+#endif //_HAVE_OMP
   {
     long i;
 
+#ifdef _HAVE_OMP
 #pragma omp for schedule(dynamic)    
+#endif //_HAVE_OMP
     for(i=0;i<pars->n_nu;i++) {
       long ip;
       double nufrac=pars->nutable[0][i]/NU_HI;

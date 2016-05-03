@@ -80,7 +80,12 @@ void mk_psources_maps(ParamGetHI *par)
   {
     int iz;
     double dx=par->l_box/par->n_grid;
-    unsigned int seed_thr=par->seed_rng+IThread0+omp_get_thread_num();
+#ifdef _HAVE_OMP
+    int ithr=omp_get_thread_num();
+#else //_HAVE_OMP
+    int ithr=0;
+#endif //_HAVE_OMP
+    unsigned int seed_thr=par->seed_rng+IThread0+ithr;
     gsl_rng *rng_thr=init_rng(seed_thr);
     long n_pix_ang=nside2npix(par->n_side);
     double dOmega=4*M_PI/n_pix_ang;
@@ -185,7 +190,7 @@ void mk_T_maps(ParamGetHI *par)
     for(iz=0;iz<par->nz_here;iz++) {
       int iy;
       int inu=0;
-      double z0=dx*(iz+0.5)-par->pos_obs[2];
+      double z0=dx*(iz+par->iz0_here+0.5)-par->pos_obs[2];
       lint indexz=iz*((lint)(2*(par->n_grid/2+1)*par->n_grid));
       for(iy=0;iy<par->n_grid;iy++) {
 	int ix;

@@ -34,12 +34,16 @@ static int i_haslam;
 
 void add_haslam(ParamsForGet *pars,flouble **maps)
 {
+#ifdef _HAVE_OMP
 #pragma omp parallel default(none) \
   shared(pars,maps,galaxy_template,specin_template)
+#endif //_HAVE_OMP
   {
     int inu;
 
+#ifdef _HAVE_OMP
 #pragma omp for
+#endif //_HAVE_OMP
     for(inu=0;inu<pars->n_nu;inu++) {
       long ii;
       double nu=pars->nutable[0][inu];
@@ -85,14 +89,18 @@ void constrain_alms(ParamsForGet *pars,gsl_matrix *eigenvec,
   }
   ev_h_k0=gsl_matrix_get(eigenvec,i_haslam,k0);
 
+#ifdef _HAVE_OMP
 #pragma omp parallel default(none)		\
   shared(pars,ev_haslam,ev_h_k0,alms,k0)
+#endif //_HAVE_OMP
   {
     int l;
     gsl_vector *aux_re=gsl_vector_alloc(pars->n_nu);
     gsl_vector *aux_im=gsl_vector_alloc(pars->n_nu);
 
+#ifdef _HAVE_OMP
 #pragma omp for
+#endif //_HAVE_OMP
     for(l=0;l<LMAX_HASLAM;l++) {
       int m;
       for(m=0;m<=l;m++) {
