@@ -35,7 +35,7 @@ static void run_foregrounds(ParamsForGet *pars)
     maps_u=NULL;
   }
 
-  write_maps(pars->prefix_out,pars->nside,pars->n_nu,
+  write_maps(pars->prefix_out,pars->nside,pars->n_nu-pars->haslam_nu_added,
 	     maps_i,maps_q,maps_u);
   
   for(ii=0;ii<pars->n_nu;ii++)

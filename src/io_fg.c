@@ -256,7 +256,7 @@ ParamsForGet *read_input_params_ForGet(char *fname)
   else pars->seed=(unsigned int)seed_signed;
   printf("  seed = %u\n",pars->seed);
   
-  pars->nutable=read_nutable(pars->fname_nutable,&(pars->n_nu));
+  read_nutable(pars->fname_nutable, pars);
   if(pars->nside<=0) {
     fprintf(stderr,"CRIME: Wrong nside = %d\n",pars->nside);
     exit(1);
@@ -266,30 +266,40 @@ ParamsForGet *read_input_params_ForGet(char *fname)
   return pars;
 }
 
-double **read_nutable(char *fname,int *n_nu)
+void read_nutable(char *fname, ParamsForGet *pars)
 {
   int ii,nnu;
-  double **nutable=(double **)my_malloc(3*sizeof(double *));
+  pars->nutable=(double **)my_malloc(3*sizeof(double *));
   FILE *fin=fopen(fname,"r");
   if(fin==NULL) error_open_file(fname);
   nnu=linecount(fin);
   rewind(fin);
 
-  *n_nu=nnu;
+  pars->n_nu=nnu;
+  /* We'll just allocate one extra slot in case we need if for
+     Haslam freq */
   for(ii=0;ii<3;ii++)
-    nutable[ii]=(double *)my_malloc(nnu*sizeof(double));
+    pars->nutable[ii]=(double *)my_malloc((nnu+1)*sizeof(double)); 
 
+  // only add haslam freq if doing galaxy
+  pars->haslam_nu_added=pars->do_galaxy;
   for(ii=0;ii<nnu;ii++) {
     int inu;
     double nu0,nuf,dum;
     int stat=fscanf(fin,"%d %lf %lf %lf %lf\n",
 		    &inu,&nu0,&nuf,&dum,&dum);
     if(stat!=5) error_read_line(fname,ii+1);
-    nutable[0][ii]=0.5*(nu0+nuf);
-    nutable[1][ii]=nu0;
-    nutable[2][ii]=nuf;
+    pars->nutable[0][ii]=0.5*(nu0+nuf);
+    pars->nutable[1][ii]=nu0;
+    pars->nutable[2][ii]=nuf;
+    if((NU_HASLAM<=nuf)&&(NU_HASLAM>nu0)) pars->haslam_nu_added=0;
   }
+  if (pars->haslam_nu_added) {
+    pars->n_nu++;
+    pars->nutable[0][ii]=NU_HASLAM;
+    pars->nutable[1][ii]=NU_HASLAM-0.5; /* dummy freq differences */
+    pars->nutable[2][ii]=NU_HASLAM+0.5;
+  }
+  
   fclose(fin);
-
-  return nutable;
 }

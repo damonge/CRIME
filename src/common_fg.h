@@ -51,6 +51,7 @@ typedef struct {
   int lref;
   int n_nu;
   double **nutable;
+  int haslam_nu_added;
   int do_polarization;
   double xi_polarization;
   double beta_polarization;
@@ -96,7 +97,7 @@ void write_maps(char *prefix_out,int nside,int n_nu,
 
 ParamsForGet *read_input_params_ForGet(char *fname);
 
-double **read_nutable(char *fname,int *n_nu);
+void read_nutable(char *fname, ParamsForGet* pars);
 
 
 #endif //_FORGET_COMMON_
