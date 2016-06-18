@@ -26,10 +26,10 @@
 
 double fraction_HI(double z)
 {
-  return 0.008*(1+z);
+  return 0.008*pow(1+z,0.6);
 }
 
 double bias_HI(double z)
 {
-  return 1;
+  return 0.904+0.135*pow(1+z,1.696);
 }

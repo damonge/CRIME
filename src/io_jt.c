@@ -172,13 +172,15 @@ ParamsJoinT *read_input_params_JoinT(char *fname)
   }
 
   if(pars->do_polarization!=1) pars->do_polarization=0;
-  if((pars->polarization_leakage<0)||(pars->polarization_leakage>1)) {
-    fprintf(stderr,"CRIME: wrong polarization leakage %.3lE\n",
-	    pars->polarization_leakage);
-    exit(1);
-  }
-  else {
-    printf("  polarization leakage (%%) : %.3lE\n",100*(pars->polarization_leakage));
+  if(pars->do_polarization) {
+    if((pars->polarization_leakage<0)||(pars->polarization_leakage>1)) {
+      fprintf(stderr,"CRIME: wrong polarization leakage %.3lE\n",
+	      pars->polarization_leakage);
+      exit(1);
+    }
+    else {
+      printf("  polarization leakage (%%) : %.3lE\n",100*(pars->polarization_leakage));
+    }
   }
 
   if(seed_signed<=0) pars->seed=time(NULL);
