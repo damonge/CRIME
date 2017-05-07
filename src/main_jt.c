@@ -296,19 +296,16 @@ void add_noise(ParamsJoinT *pars,flouble **maps)
 #endif //_HAVE_OMP
     for(inu=0;inu<pars->n_nu;inu++) {
       long ii;
-      double nu=pars->nutable[0][inu];
       double dnu=pars->nutable[2][inu]-pars->nutable[1][inu];
-      double n_elements,sigma2_noise;
-
-      if(pars->dish_diameter>0) {
-	double theta_fwhm=(M_PI/(180*60))*PREFAC_FWHM/(nu*pars->dish_diameter);
-	n_elements=pars->fsky*4*M_PI/(1.1330900354567985*theta_fwhm*theta_fwhm);
-      }
-      else
-	n_elements=pars->fsky*npix;
-
-      sigma2_noise=2*n_elements*(pars->tsys*pars->tsys)/
-	(PREFAC_TNU*dnu*pars->time_tot*pars->n_dish);
+      double n_elements=pars->fsky*npix;
+#ifdef _ADD_ATM
+      double nu=pars->nutable[0][inu];
+      double t_sky=6E4*pow(nu/300.,-2.5);
+      double t_sys=pars->tsys+t_sky;
+#else //_ADD_ATM
+      double t_sys=pars->tsys;
+#endif //_ADD_ATM     
+      double sigma2_noise=n_elements*t_sys*t_sys/(PREFAC_TNU*dnu*pars->time_tot*pars->n_dish);
 
       for(ii=0;ii<npix;ii++) {
 	double mod,phase,noise;
